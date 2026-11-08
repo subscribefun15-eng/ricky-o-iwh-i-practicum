@@ -1,71 +1,124 @@
+
+require('dotenv').config();
+
 const express = require('express');
 const axios = require('axios');
-const app = express();
+const path = require('path');
 
+const app = express();
+const PORT = 3000;
+
+// Express setup
 app.set('view engine', 'pug');
-app.use(express.static(__dirname + '/public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// * Please DO NOT INCLUDE the private app access token in your repo. Don't do this practicum in your normal account.
-const PRIVATE_APP_ACCESS = '';
+// HubSpot configuration
+const token = process.env.HUBSPOT_SERVICE_KEY;
+const objectId = process.env.HUBSPOT_OBJECT_TYPE_ID;
 
-// TODO: ROUTE 1 - Create a new app.get route for the homepage to call your custom object data. Pass this data along to the front-end and create a new pug template in the views folder.
+const nameProperty = process.env.HUBSPOT_NAME_PROPERTY || 'name';
+const genreProperty = process.env.HUBSPOT_GENRE_PROPERTY || 'genre';
+const bpmProperty = process.env.HUBSPOT_BPM_PROPERTY || 'bpm';
 
-// * Code for Route 1 goes here
+if (!token || !objectId) {
+  console.error('Missing HubSpot settings in .env');
+  process.exit(1);
+}
 
-// TODO: ROUTE 2 - Create a new app.get route for the form to create or update new custom object data. Send this data along in the next route.
-
-// * Code for Route 2 goes here
-
-// TODO: ROUTE 3 - Create a new app.post route for the custom objects form to create or update your custom object data. Once executed, redirect the user to the homepage.
-
-// * Code for Route 3 goes here
-
-/** 
-* * This is sample code to give you a reference for how you should structure your calls. 
-
-* * App.get sample
-app.get('/contacts', async (req, res) => {
-    const contacts = 'https://api.hubspot.com/crm/v3/objects/contacts';
-    const headers = {
-        Authorization: `Bearer ${PRIVATE_APP_ACCESS}`,
-        'Content-Type': 'application/json'
-    }
-    try {
-        const resp = await axios.get(contacts, { headers });
-        const data = resp.data.results;
-        res.render('contacts', { title: 'Contacts | HubSpot APIs', data });      
-    } catch (error) {
-        console.error(error);
-    }
+const hubspot = axios.create({
+  baseURL: 'https://api.hubapi.com',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  timeout: 10000
 });
 
-* * App.post sample
-app.post('/update', async (req, res) => {
-    const update = {
-        properties: {
-            "favorite_book": req.body.newVal
+const objectEndpoint = `/crm/v3/objects/${encodeURIComponent(objectId)}`;
+
+// ROUTE 1: Display Music Projects
+app.get('/', async (req, res) => {
+  try {
+    const projects = [];
+    let after;
+
+    do {
+      const response = await hubspot.get(objectEndpoint, {
+        params: {
+          properties: [
+            nameProperty,
+            genreProperty,
+            bpmProperty
+          ].join(','),
+          limit: 100,
+          ...(after ? { after } : {})
         }
-    }
+      });
 
-    const email = req.query.email;
-    const updateContact = `https://api.hubapi.com/crm/v3/objects/contacts/${email}?idProperty=email`;
-    const headers = {
-        Authorization: `Bearer ${PRIVATE_APP_ACCESS}`,
-        'Content-Type': 'application/json'
-    };
+      const records = response.data.results || [];
 
-    try { 
-        await axios.patch(updateContact, update, { headers } );
-        res.redirect('back');
-    } catch(err) {
-        console.error(err);
-    }
+      for (const record of records) {
+        projects.push({
+          id: record.id,
+          name: record.properties[nameProperty],
+          genre: record.properties[genreProperty],
+          bpm: record.properties[bpmProperty]
+        });
+      }
 
+      after = response.data.paging?.next?.after;
+    } while (after);
+
+    res.render('homepage', {
+      title: 'Music Projects | HubSpot Practicum',
+      projects
+    });
+  } catch (error) {
+    console.error('HubSpot GET failed:', error.response?.status);
+    console.error('Reason:', error.response?.data?.message || error.message);
+    res.status(502).send('Unable to retrieve Music Projects from HubSpot.');
+  }
 });
-*/
 
+// ROUTE 2: Display Add Music Project form
+app.get('/update-cobj', (req, res) => {
+  res.render('updates', {
+    title: 'Update Custom Object Form | Integrating With HubSpot I Practicum'
+  });
+});
 
-// * Localhost
-app.listen(3000, () => console.log('Listening on http://localhost:3000'));
+// ROUTE 3: Create a new Music Project
+app.post('/update-cobj', async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const genre = String(req.body.genre || '').trim();
+  const bpm = Number(req.body.bpm);
+
+  if (!name || !genre || !Number.isFinite(bpm) || bpm <= 0) {
+    return res.status(400).send('Please enter a valid name, genre, and BPM.');
+  }
+
+  const newProject = {
+    properties: {
+      [nameProperty]: name,
+      [genreProperty]: genre,
+      [bpmProperty]: String(bpm)
+    }
+  };
+
+  try {
+    await hubspot.post(objectEndpoint, newProject);
+
+    // Return to the homepage after creating the record
+    res.redirect('/');
+  } catch (error) {
+    console.error('HubSpot POST failed:', error.response?.status || error.message);
+    res.status(502).send('Unable to create Music Project in HubSpot.');
+  }
+});
+
+// Start the application
+app.listen(PORT, () => {
+  console.log(`App running at http://localhost:${PORT}`);
+});
