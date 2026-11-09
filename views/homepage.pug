@@ -1,0 +1,35 @@
+
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title= title
+    link(rel="stylesheet" href="/css/style.css")
+
+  body
+    main
+      h1 Music Projects
+      p HubSpot Foundations Practicum
+
+      a(href="/update-cobj") Add to this table
+
+      hr
+
+      table
+        thead
+          tr
+            th Name
+            th Genre
+            th BPM
+
+        tbody
+          if projects.length
+            each project in projects
+              tr
+                td= project.name
+                td= project.genre
+                td= project.bpm
+          else
+            tr
+              td(colspan="3") No music projects found.

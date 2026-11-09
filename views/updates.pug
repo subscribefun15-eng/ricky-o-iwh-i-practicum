@@ -1,0 +1,47 @@
+
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title= title
+    link(rel="stylesheet" href="/css/style.css")
+
+  body
+    main
+      h1 Add a Music Project
+      p Create a new record in HubSpot.
+
+      form(action="/update-cobj" method="POST")
+        div
+          label(for="name") Project Name
+          input(
+            type="text"
+            id="name"
+            name="name"
+            required
+          )
+
+        div
+          label(for="genre") Genre
+          input(
+            type="text"
+            id="genre"
+            name="genre"
+            required
+          )
+
+        div
+          label(for="bpm") BPM
+          input(
+            type="number"
+            id="bpm"
+            name="bpm"
+            min="1"
+            required
+          )
+
+        button(type="submit") Create Music Project
+
+      p
+        a(href="/") Return to the homepage
