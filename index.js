@@ -4,6 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
+const { validateProject } = require('./validateProject');
 
 const app = express();
 const PORT = 3000;
@@ -91,13 +92,13 @@ app.get('/update-cobj', (req, res) => {
 
 // ROUTE 3: Create a new Music Project
 app.post('/update-cobj', async (req, res) => {
-  const name = String(req.body.name || '').trim();
-  const genre = String(req.body.genre || '').trim();
-  const bpm = Number(req.body.bpm);
+    const project = validateProject(req.body);
 
-  if (!name || !genre || !Number.isFinite(bpm) || bpm <= 0) {
-    return res.status(400).send('Please enter a valid name, genre, and BPM.');
-  }
+    if (!project) {
+      return res.status(400).send('Please enter a valid name, genre, and BPM.');
+    }
+
+    const { name, genre, bpm } = project;
 
   const newProject = {
     properties: {
